@@ -1,123 +1,110 @@
-name: Process PS5 Package
+- name: Get current file name from GitHub repo  # 从 GitHub 上获取当前文件名
+  id: get_current_file_name
+  shell: pwsh
+  run: |
+    $url = "https://raw.githubusercontent.com/PSGO/Itemzflow-PS5-CN/refs/heads/main/filename.txt"
+    $currentFileName = (Invoke-WebRequest -Uri $url -Method Get | Select-Object -ExpandProperty Content).Trim()
+    Write-Output "Current file name from GitHub: '$currentFileName'"
+    echo "::set-output name=current_file_name::$currentFileName"  # 设置输出
 
-on:
-  workflow_dispatch:  # 手动触发
-  schedule:
-    - cron: "0 */6 * * *"  # 每6小时运行一次
+- name: Get file name from URL  # 获取文件名
+  id: get_latest_file_name
+  shell: pwsh
+  run: |
+    $url = "https://pkg-zone.com/download/ps5/ITEM00001/latest"
+    $response = Invoke-WebRequest -Uri $url -Method Head
+    $fileNameMatch = $response.Headers["Content-Disposition"]
+    $latestFileName = ($fileNameMatch -replace "attachment; filename=", "" -replace ".pkg", "").Trim()
+    Write-Output "File name from URL: '$latestFileName'"
+    echo "::set-output name=latest_file_name::$latestFileName"  # 设置输出
+    
+    # 输出字符的字节值，进行详细的字符比较
+    $currentFileName = "${{ steps.get_current_file_name.outputs.current_file_name }}"  # 从上一步获取文件名
 
-jobs:
-  process_package:
-    runs-on: windows-latest
+    # 输出每个字符的字节值
+    Write-Output "Current File Name Bytes: $([BitConverter]::ToString([System.Text.Encoding]::UTF8.GetBytes($currentFileName)))"
+    Write-Output "Latest File Name Bytes: $([BitConverter]::ToString([System.Text.Encoding]::UTF8.GetBytes($latestFileName)))"
 
-    steps:
-    - name: Get current file name from GitHub repo  # 从 GitHub 上获取当前文件名
-      id: get_current_file_name
-      shell: pwsh
-      run: |
-        $url = "https://raw.githubusercontent.com/PSGO/Itemzflow-PS5-CN/refs/heads/main/filename.txt"
-        $currentFileName = (Invoke-WebRequest -Uri $url -Method Get | Select-Object -ExpandProperty Content).Trim()
-        Write-Output "Current file name from GitHub: $currentFileName"
-        echo "::set-output name=current_file_name::$currentFileName"  # 设置输出
+    # 比较字符字节
+    if ($currentFileName.Trim() -eq $latestFileName.Trim()) {
+        Write-Output "文件名完全一致，未发生变化"
+    } else {
+        Write-Output "文件名发生变化，发布了新版本: $latestFileName"
+    }
 
-    - name: Get file name from URL  # 获取文件名
-      id: get_latest_file_name
-      shell: pwsh
-      run: |
-        $url = "https://pkg-zone.com/download/ps5/ITEM00001/latest"
-        $response = Invoke-WebRequest -Uri $url -Method Head
-        $fileNameMatch = $response.Headers["Content-Disposition"]
-        $latestFileName = ($fileNameMatch -replace "attachment; filename=", "" -replace ".pkg", "").Trim()
-        Write-Output "File name from URL: $latestFileName"
-        echo "::set-output name=latest_file_name::$latestFileName"  # 设置输出
-        
-        # 获取传递的 GitHub 文件名并进行比较
-        $currentFileName = "${{ steps.get_current_file_name.outputs.current_file_name }}"  # 从上一步获取文件名
-        
-        # 输出两者内容以调试
-        Write-Output "Current File Name: '$currentFileName'"
-        Write-Output "Latest File Name: '$latestFileName'"
-        
-        # 比较两者内容是否完全一致
-        if ($currentFileName -eq $latestFileName) {
-            Write-Output "文件名发生变化，发布了新版本: $latestFileName"
-        } else {
-            Write-Output "文件名没有变化，无需更新版本"
-            exit 1
-        }
+- name: Checkout repository  # 检出仓库内容
+  uses: actions/checkout@v2
 
-    - name: Checkout repository  # 检出仓库内容
-      uses: actions/checkout@v2
+- name: Download the file  # 下载文件
+  shell: pwsh
+  run: |
+    $pkgUrl = "https://pkg-zone.com/download/ps5/ITEM00001/latest"
+    $pkgDestination = "PS4_Fake_PKG_Tools\\PKG\\PS5_ITEM00001.pkg"
+    Invoke-WebRequest -Uri $pkgUrl -OutFile $pkgDestination
+    Write-Output "文件已下载到: $pkgDestination"
 
-    - name: Download the file  # 下载文件
-      shell: pwsh
-      run: |
-        $pkgUrl = "https://pkg-zone.com/download/ps5/ITEM00001/latest"
-        $pkgDestination = "PS4_Fake_PKG_Tools\\PKG\\PS5_ITEM00001.pkg"
-        Invoke-WebRequest -Uri $pkgUrl -OutFile $pkgDestination
-        Write-Output "文件已下载到: $pkgDestination"
+- name: Run auto.bat  # 执行自动化脚本
+  shell: cmd
+  run: |
+    PS4_Fake_PKG_Tools\\auto.bat
+    echo "auto.bat 执行完成"
 
-    - name: Run auto.bat  # 执行自动化脚本
-      shell: cmd
-      run: |
-        PS4_Fake_PKG_Tools\\auto.bat
-        echo "auto.bat 执行完成"
+- name: Compress the .pkg file  # 压缩 .pkg 文件为 .zip
+  shell: pwsh
+  run: |
+    $outputFolder = "PS4_Fake_PKG_Tools\\PKG\\output"
+    $outputFile = Get-ChildItem -Path $outputFolder -Filter "*.pkg" | Sort-Object LastWriteTime | Select-Object -First 1
 
-    - name: Compress the .pkg file  # 压缩 .pkg 文件为 .zip
-      shell: pwsh
-      run: |
-        $outputFolder = "PS4_Fake_PKG_Tools\\PKG\\output"
-        $outputFile = Get-ChildItem -Path $outputFolder -Filter "*.pkg" | Sort-Object LastWriteTime | Select-Object -First 1
+    if ($outputFile) {
+      Write-Host "找到生成的 .pkg 文件: $($outputFile.FullName)"
+      $zipFileName = "$($outputFile.BaseName).zip"
+      $zipFilePath = "$outputFolder\\$zipFileName"
+      Compress-Archive -Path $outputFile.FullName -DestinationPath $zipFilePath
+      Write-Host "已成功压缩为: $zipFilePath"
+      echo "ZIP_FILE=$zipFilePath" >> $env:GITHUB_ENV
+      Write-Host "ZIP_FILE 设置为: $zipFilePath"
+    } else {
+      Write-Error "未找到 .pkg 文件，压缩流程终止。"
+      exit 1
+    }
 
-        if ($outputFile) {
-          Write-Host "找到生成的 .pkg 文件: $($outputFile.FullName)"
-          $zipFileName = "$($outputFile.BaseName).zip"
-          $zipFilePath = "$outputFolder\\$zipFileName"
-          Compress-Archive -Path $outputFile.FullName -DestinationPath $zipFilePath
-          Write-Host "已成功压缩为: $zipFilePath"
-          echo "ZIP_FILE=$zipFilePath" >> $env:GITHUB_ENV
-          Write-Host "ZIP_FILE 设置为: $zipFilePath"
-        } else {
-          Write-Error "未找到 .pkg 文件，压缩流程终止。"
-          exit 1
-        }
+- name: Release compressed file to GitHub Releases  # 发布新文件
+  shell: pwsh
+  env:
+    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 设置 GH_TOKEN 环境变量
+  run: |
+    $zipFile = $env:ZIP_FILE -replace '\\', '/'
+    Write-Host "读取到的 ZIP 文件路径: $zipFile"
+    if (-Not (Test-Path $zipFile)) {
+      Write-Error "ZIP 文件路径无效: $zipFile"
+      exit 1
+    }
+    
+    # 使用步骤输出的文件名作为标题和 tag
+    $releaseTitle = "${{ steps.get_latest_file_name.outputs.latest_file_name }}"  # 使用最新文件名
+    $releaseTag = "${{ steps.get_latest_file_name.outputs.latest_file_name }}"    # 使用最新文件名
+    
+    Write-Host "发布标题: $releaseTitle"
+    Write-Host "发布标签: $releaseTag"
 
-    - name: Release compressed file to GitHub Releases  # 发布新文件
-      shell: pwsh
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 设置 GH_TOKEN 环境变量
-      run: |
-        $zipFile = $env:ZIP_FILE -replace '\\', '/'
-        Write-Host "读取到的 ZIP 文件路径: $zipFile"
-        if (-Not (Test-Path $zipFile)) {
-          Write-Error "ZIP 文件路径无效: $zipFile"
-          exit 1
-        }
-        
-        # 使用步骤输出的文件名作为标题和 tag
-        $releaseTitle = "${{ steps.get_latest_file_name.outputs.latest_file_name }}"  # 使用最新文件名
-        $releaseTag = "${{ steps.get_latest_file_name.outputs.latest_file_name }}"    # 使用最新文件名
-        
-        Write-Host "发布标题: $releaseTitle"
-        Write-Host "发布标签: $releaseTag"
+    gh release create $releaseTag $zipFile --target ${{ github.sha }} -t "$releaseTitle" -n "修复中文乱码"
+    Write-Host "已成功发布压缩文件到 GitHub Releases"
 
-        gh release create $releaseTag $zipFile --target ${{ github.sha }} -t "$releaseTitle" -n "修复中文乱码"
-        Write-Host "已成功发布压缩文件到 GitHub Releases"
+- name: Update filename.txt in the repository  # 更新 filename.txt 文件
+  shell: pwsh
+  run: |
+    $fileNamePath = "filename.txt"
+    $latestFileName = "${{ steps.get_latest_file_name.outputs.latest_file_name }}"  # 获取最新文件名
+    Set-Content -Path $fileNamePath -Value $latestFileName
+    Write-Host "已将新的文件名保存到 $fileNamePath"
 
-    - name: Update filename.txt in the repository  # 更新 filename.txt 文件
-      shell: pwsh
-      run: |
-        $fileNamePath = "filename.txt"
-        $latestFileName = "${{ steps.get_latest_file_name.outputs.latest_file_name }}"  # 获取最新文件名
-        Set-Content -Path $fileNamePath -Value $latestFileName
-        Write-Host "已将新的文件名保存到 $fileNamePath"
-
-    - name: Commit and push updated filename.txt  # 提交并推送更新
-      shell: pwsh
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git add filename.txt
-        git commit -m "Update filename.txt with new file name: ${{ steps.get_latest_file_name.outputs.latest_file_name }}"
-        git push origin main
+- name: Commit and push updated filename.txt  # 提交并推送更新
+  shell: pwsh
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: |
+    git config user.name "GitHub Actions"
+    git config user.email "actions@github.com"
+    git add filename.txt
+    git commit -m "Update filename.txt with new file name: ${{ steps.get_latest_file_name.outputs.latest_file_name }}"
+    git push origin main
