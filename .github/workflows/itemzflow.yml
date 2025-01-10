@@ -29,7 +29,11 @@ jobs:
         $latestFileName = ($fileNameMatch -replace "attachment; filename=", "" -replace ".pkg", "").Trim()
         Write-Output "File name from URL: $latestFileName"
         echo "::set-output name=latest_file_name::$latestFileName"  # 设置输出
-        if ($currentFileName -eq $latestFileName) {
+        
+        # 获取传递的 GitHub 文件名并进行比较
+        $currentFileName = "${{ steps.get_current_file_name.outputs.current_file_name }}"  # 从上一步获取文件名
+        
+        if ($currentFileName.Trim().ToLower() -eq $latestFileName.Trim().ToLower()) {
             Write-Output "文件名发生变化，发布了新版本: $latestFileName"
         } else {
             Write-Output "文件名没有变化，无需更新版本"
