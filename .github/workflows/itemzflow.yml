@@ -33,7 +33,12 @@ jobs:
         # 获取传递的 GitHub 文件名并进行比较
         $currentFileName = "${{ steps.get_current_file_name.outputs.current_file_name }}"  # 从上一步获取文件名
         
-        if ($currentFileName.Trim().ToLower() -eq $latestFileName.Trim().ToLower()) {
+        # 使用正则表达式去除掉字符串中的所有非字母数字字符（包括空格）
+        $currentFileNameCleaned = $currentFileName -replace '[^\w\d]', ''
+        $latestFileNameCleaned = $latestFileName -replace '[^\w\d]', ''
+
+        # 比较去除特殊字符后的文件名
+        if ($currentFileNameCleaned.ToLower() -eq $latestFileNameCleaned.ToLower()) {
             Write-Output "文件名发生变化，发布了新版本: $latestFileName"
         } else {
             Write-Output "文件名没有变化，无需更新版本"
