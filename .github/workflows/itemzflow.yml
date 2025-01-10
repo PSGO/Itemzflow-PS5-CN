@@ -33,12 +33,12 @@ jobs:
         # 获取传递的 GitHub 文件名并进行比较
         $currentFileName = "${{ steps.get_current_file_name.outputs.current_file_name }}"  # 从上一步获取文件名
         
-        # 计算文件名的哈希值（使用 SHA256）
-        $sha256 = [System.Security.Cryptography.SHA256]::Create()
-        $currentFileHash = [BitConverter]::ToString($sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($currentFileName))).Replace("-","").ToLower()
-        $latestFileHash = [BitConverter]::ToString($sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($latestFileName))).Replace("-","").ToLower()
+        # 输出两者内容以调试
+        Write-Output "Current File Name: '$currentFileName'"
+        Write-Output "Latest File Name: '$latestFileName'"
         
-        if ($currentFileHash -eq $latestFileHash) {
+        # 比较两者内容是否完全一致
+        if ($currentFileName -eq $latestFileName) {
             Write-Output "文件名发生变化，发布了新版本: $latestFileName"
         } else {
             Write-Output "文件名没有变化，无需更新版本"
