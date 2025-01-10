@@ -1,4 +1,4 @@
-name: Process PS5 Package
+name: itemzflow CN
 
 on:
   workflow_dispatch:  # 手动触发
@@ -52,7 +52,7 @@ jobs:
       shell: pwsh
       run: |
         $pkgUrl = "https://pkg-zone.com/download/ps5/ITEM00001/latest"
-        $pkgDestination = "PS4_Fake_PKG_Tools\\PKG\\PS5_ITEM00001.pkg"
+        $pkgDestination = "PS4_Fake_PKG_Tools\\PKG\\0.pkg"
         Invoke-WebRequest -Uri $pkgUrl -OutFile $pkgDestination
         Write-Output "文件已下载到: $pkgDestination"
 

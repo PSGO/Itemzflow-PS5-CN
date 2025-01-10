@@ -4,7 +4,7 @@ REM Set the working directory to the location of the batch file
 cd /d %~dp0
 
 mkdir "PKG\output"
-orbis-pub-cmd.exe img_extract --passcode 00000000000000000000000000000000 "PKG\PS5_ITEM00001.pkg" "PKG\output"
+orbis-pub-cmd.exe img_extract --passcode 00000000000000000000000000000000 "PKG\0.pkg" "PKG\output"
 echo Extraction completed.
 powershell -command "Start-Sleep -Seconds 3"
 echo ------------------
