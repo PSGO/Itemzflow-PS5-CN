@@ -33,16 +33,11 @@ jobs:
         # 获取传递的 GitHub 文件名并进行比较
         $currentFileName = "${{ steps.get_current_file_name.outputs.current_file_name }}"  # 从上一步获取文件名
         
-        # 直接对比字节内容
-        function Get-FileBytes {
-            param ([string]$filePath)
-            return [System.IO.File]::ReadAllBytes($filePath)
-        }
-
-        $currentFileBytes = [System.Text.Encoding]::UTF8.GetBytes($currentFileName)  # 将当前文件名转换为字节数组
-        $latestFileBytes = [System.Text.Encoding]::UTF8.GetBytes($latestFileName)    # 将最新文件名转换为字节数组
-
-        if ($currentFileBytes -join '' -eq $latestFileBytes -join '') {
+        # 计算文件名的哈希值
+        $currentFileHash = [System.Text.Encoding]::UTF8.GetBytes($currentFileName) | Get-FileHash -Algorithm SHA256
+        $latestFileHash = [System.Text.Encoding]::UTF8.GetBytes($latestFileName) | Get-FileHash -Algorithm SHA256
+        
+        if ($currentFileHash.Hash -eq $latestFileHash.Hash) {
             Write-Output "文件名发生变化，发布了新版本: $latestFileName"
         } else {
             Write-Output "文件名没有变化，无需更新版本"
