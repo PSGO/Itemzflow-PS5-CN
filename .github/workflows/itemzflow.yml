@@ -100,7 +100,7 @@ jobs:
         Write-Host "发布标题: $releaseTitle"
         Write-Host "发布标签: $releaseTag"
 
-        gh release create $releaseTag $zipFile --target ${{ github.sha }} -t "$releaseTitle" -n "修复中文乱码"
+        gh release create $releaseTag $zipFile --target ${{ github.sha }} -t "$releaseTitle" -n "PS5版Itemzflow修复中文乱码"
         Write-Host "已成功发布压缩文件到 GitHub Releases"
 
     - name: Update filename.txt in the repository  # 更新 filename.txt 文件
