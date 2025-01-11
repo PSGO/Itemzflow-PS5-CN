@@ -3,7 +3,7 @@ name: itemzflow CN
 on:
   workflow_dispatch:  # 手动触发
   schedule:
-    - cron: '0 */6 * * *'  # 每6小时运行一次
+    - cron: '0 */3 * * *'  # 每6小时运行一次
 
 jobs:
   process_package:
@@ -119,5 +119,5 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         git add filename.txt
-        git commit -m "Update filename.txt with new file name: ${{ steps.get_latest_file_name.outputs.latest_file_name }}"
+        git commit -m "Update ${{ steps.get_latest_file_name.outputs.latest_file_name }}"
         git push origin main
