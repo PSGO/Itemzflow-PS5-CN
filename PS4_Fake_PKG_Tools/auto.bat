@@ -14,8 +14,9 @@ echo Sc0 folder copied successfully.
 powershell -command "Start-Sleep -Seconds 2"
 echo ------------------
 
-xcopy /Y /S "PKG\output\Image0\langs\11\*" "PKG\output\Image0\langs\10\*"
-xcopy /Y /S "PKG\output\Image0\langs\11\*" "PKG\output\Image0\langs\0\*"
+xcopy /Y /S "PKG\output\Image0\langs\11\*" "PKG\output\Image0\langs\10"
+xcopy /Y /S "PKG\output\Image0\langs\11\*" "PKG\output\Image0\langs\0"
+xcopy /Y /S "PKG\output\Image0\langs\11\*" "PKG\output\Image0\langs\1"
 echo langs copied successfully.
 powershell -command "Start-Sleep -Seconds 2"
 echo ------------------
