@@ -26,7 +26,7 @@ jobs:
         $url = "https://pkg-zone.com/download/ps5/ITEM00001/latest"
         $response = Invoke-WebRequest -Uri $url -Method Head
         $fileNameMatch = $response.Headers["Content-Disposition"]
-        $latestFileName = ($fileNameMatch -replace "attachment; version=", "" -replace ".pkg", "").Trim()
+        $latestFileName = ($fileNameMatch -replace "attachment; filename=", "" -replace ".pkg", "").Trim()
         Write-Output "File name from URL: '$latestFileName'"
         echo "::set-output name=latest_file_name::$latestFileName"  # 设置输出
         
@@ -47,6 +47,7 @@ jobs:
 
     - name: Checkout repository  # 检出仓库内容
       uses: actions/checkout@v2
+
 
     - name: Update version.txt in the repository  # 更新 version.txt 文件
       shell: pwsh
