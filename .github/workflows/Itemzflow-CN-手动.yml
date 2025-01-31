@@ -1,0 +1,85 @@
+name: itemzflow CN 手动触发
+
+on:
+  workflow_dispatch:  # 手动触发  修改URL 和 文件名
+
+jobs:
+  process_package:
+    runs-on: windows-latest
+
+    steps:
+    - name: Get file name from URL  # 获取文件名
+      id: get_latest_file_name
+      shell: pwsh
+      run: |
+        $latestFileName = "For-etaHEN2.0b-pre"
+        Write-Output "File name: '$latestFileName'"
+        echo "::set-output name=latest_file_name::$latestFileName"  # 在这里临时改名！！！！！！！！
+
+    - name: Checkout repository  # 检出仓库内容
+      uses: actions/checkout@v2
+
+    - name: Download the file  # 下载文件
+      shell: pwsh
+      run: |
+        $pkgUrl = "https://github.com/etaHEN/etaHEN/releases/download/2.0b-pre/IV0002-ITEM00001_00-STOREUPD00000000.pkg"  # 在这里临时下载地址！！！！！！！！
+        $pkgDestination = "PS4_Fake_PKG_Tools\\PKG\\0.pkg"
+        Invoke-WebRequest -Uri $pkgUrl -OutFile $pkgDestination
+        Write-Output "文件已下载到: $pkgDestination"
+
+    - name: Run auto.bat  # 执行自动化脚本
+      shell: cmd
+      run: |
+        PS4_Fake_PKG_Tools\\auto.bat
+        echo "auto.bat 执行完成"
+
+    - name: Compress the .pkg file  # 压缩 .pkg 文件为 .zip
+      shell: pwsh
+      run: |
+        $outputFolder = "PS4_Fake_PKG_Tools\\PKG\\output"
+        $outputFile = Get-ChildItem -Path $outputFolder -Filter "*.pkg" | Sort-Object LastWriteTime | Select-Object -First 1
+
+        if ($outputFile) {
+          Write-Host "找到生成的 .pkg 文件: $($outputFile.FullName)"
+          $zipFileName = "$($outputFile.BaseName).zip"
+          $zipFilePath = "$outputFolder\\$zipFileName"
+          Compress-Archive -Path $outputFile.FullName -DestinationPath $zipFilePath
+          Write-Host "已成功压缩为: $zipFilePath"
+          echo "ZIP_FILE=$zipFilePath" >> $env:GITHUB_ENV
+          Write-Host "ZIP_FILE 设置为: $zipFilePath"
+        } else {
+          Write-Error "未找到 .pkg 文件，压缩流程终止。"
+          exit 1
+        }
+
+    - name: Release compressed file to GitHub Releases  # 发布新文件
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 设置 GH_TOKEN 环境变量
+      run: |
+        $zipFile = $env:ZIP_FILE -replace '\\', '/'
+        Write-Host "读取到的 ZIP 文件路径: $zipFile"
+        if (-Not (Test-Path $zipFile)) {
+          Write-Error "ZIP 文件路径无效: $zipFile"
+          exit 1
+        }
+        
+        # 使用步骤输出的文件名作为标题和 tag
+        $releaseTitle = "${{ steps.get_latest_file_name.outputs.latest_file_name }}"  # 使用最新文件名
+        $releaseTag = "${{ steps.get_latest_file_name.outputs.latest_file_name }}"    # 使用最新文件名
+        
+        Write-Host "发布标题: $releaseTitle"
+        Write-Host "发布标签: $releaseTag"
+
+        gh release create $releaseTag $zipFile --target ${{ github.sha }} -t "$releaseTitle" -n "PS5版Itemzflow修复中文乱码，安装前先卸载原版"
+        Write-Host "已成功发布压缩文件到 GitHub Releases"
+
+    - name: Commit and push updated filename.txt  # 提交并推送更新
+      shell: pwsh
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git commit -m "Update ${{ steps.get_latest_file_name.outputs.latest_file_name }}"
+        git push origin main
