@@ -1,9 +1,7 @@
-name: itemzflow CN
+name: Process PS5 Package
 
 on:
   workflow_dispatch:  # 手动触发
-  schedule:
-    - cron: '0 0 * * *'  # 每天 UTC 时间 00:00 运行 改为每天运行一次 后续只保留手动
 
 jobs:
   process_package:
@@ -14,9 +12,9 @@ jobs:
       id: get_current_file_name
       shell: pwsh
       run: |
-        $url = "https://raw.githubusercontent.com/PSGO/Itemzflow-PS5-CN/refs/heads/main/filename.txt"
+        $url = "https://raw.githubusercontent.com/PSGO/Itemzflow-CN/refs/heads/main/filename.txt"
         $currentFileName = (Invoke-WebRequest -Uri $url -Method Get | Select-Object -ExpandProperty Content).Trim()
-        Write-Output "Current file name from GitHub: '$currentFileName'"
+        Write-Output "Current file name from GitHub: $currentFileName"
         echo "::set-output name=current_file_name::$currentFileName"  # 设置输出
 
     - name: Get file name from URL  # 获取文件名
@@ -27,22 +25,13 @@ jobs:
         $response = Invoke-WebRequest -Uri $url -Method Head
         $fileNameMatch = $response.Headers["Content-Disposition"]
         $latestFileName = ($fileNameMatch -replace "attachment; filename=", "" -replace ".pkg", "").Trim()
-        Write-Output "File name from URL: '$latestFileName'"
+        Write-Output "File name from URL: $latestFileName"
         echo "::set-output name=latest_file_name::$latestFileName"  # 设置输出
-        
-        # 输出字符的字节值，进行详细的字符比较
-        $currentFileName = "${{ steps.get_current_file_name.outputs.current_file_name }}"  # 从上一步获取文件名
-
-        # 输出每个字符的字节值
-        Write-Output "Current File Name Bytes: $([BitConverter]::ToString([System.Text.Encoding]::UTF8.GetBytes($currentFileName)))"
-        Write-Output "Latest File Name Bytes: $([BitConverter]::ToString([System.Text.Encoding]::UTF8.GetBytes($latestFileName)))"
-
-        # 比较字符字节
-        if ($currentFileName.Trim() -eq $latestFileName.Trim()) {
-            Write-Output "文件名完全一致，未发生变化"
-            exit 1
-        } else {
+        if ($currentFileName -eq $latestFileName) {
             Write-Output "文件名发生变化，发布了新版本: $latestFileName"
+        } else {
+            Write-Output "文件名没有变化，无需更新版本"
+            exit 1
         }
 
     - name: Checkout repository  # 检出仓库内容
@@ -52,7 +41,7 @@ jobs:
       shell: pwsh
       run: |
         $pkgUrl = "https://pkg-zone.com/download/ps5/ITEM00001/latest"
-        $pkgDestination = "PS4_Fake_PKG_Tools\\PKG\\0.pkg"
+        $pkgDestination = "PS4_Fake_PKG_Tools\\PKG\\PS5_ITEM00001.pkg"
         Invoke-WebRequest -Uri $pkgUrl -OutFile $pkgDestination
         Write-Output "文件已下载到: $pkgDestination"
 
@@ -100,7 +89,7 @@ jobs:
         Write-Host "发布标题: $releaseTitle"
         Write-Host "发布标签: $releaseTag"
 
-        gh release create $releaseTag $zipFile --target ${{ github.sha }} -t "$releaseTitle" -n "PS5版Itemzflow修复中文乱码，安装前先卸载原版"
+        gh release create $releaseTag $zipFile --target ${{ github.sha }} -t "$releaseTitle" -n "修复中文乱码"
         Write-Host "已成功发布压缩文件到 GitHub Releases"
 
     - name: Update filename.txt in the repository  # 更新 filename.txt 文件
@@ -119,5 +108,5 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         git add filename.txt
-        git commit -m "Update ${{ steps.get_latest_file_name.outputs.latest_file_name }}"
+        git commit -m "Update filename.txt with new file name: ${{ steps.get_latest_file_name.outputs.latest_file_name }}"
         git push origin main
