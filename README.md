@@ -1,5 +1,7 @@
 本项目已停用！
 
+If you need to create a local language version, you can refer to this project.
+
 Itemzflow原版从 v1.09公测版开始已修复中文乱码，请使用原版。
 
 PS5版Itemzflow，修复中文乱码，安装前先卸载原版
